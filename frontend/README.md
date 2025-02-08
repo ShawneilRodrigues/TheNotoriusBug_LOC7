@@ -1,103 +1,36 @@
-# Next.js + Supabase Auth starter template with shadcn-UI and Tailwind CSS
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-## ⚡Demo:
+## Getting Started
 
-[View Vercel Demo](https://supa-next-shad-auth.vercel.app/)
+First, run the development server:
 
-`NOTE: Every resource used in this project are free to use for a certain threshold.`
-
-## Things to keep in mind while testing 🤯.
-
-- Supabase restricts user registration. So if, you are unable to Sign up as a new user, don't worry!
-- I've provided the test Login credentials in the `.env.local.example` file. Use those to test out things!
-
-<mark>Star ⭐ this repository if you find this useful 🙂.</mark>
-
-## 🚀 Getting Started
-
-1. Run the following command to create a new project with this starter.
-
-```
-yarn create next-app my-app -e https://github.com/Sahil-Sharma-23/supa-next-shad-auth
+```bash
+npm run dev
 # or
-npx create-next-app my-app -e https://github.com/Sahil-Sharma-23/supa-next-shad-auth
-```
-
-2. Initialize a project in Supabase. [See it how!](https://supabase.com/dashboard)
-
-3. Rename `.env.local.example` file to `.env.local` and add the `SUPABASE_URL` & `SUPABASE_ANON_KEY` generated after creating project in Supabase.
-
-4. Once the project is setup and the dependencies are finished installing, you can navigate to that directory and start up the development server with:
-
-```
 yarn dev
 # or
-npm run dev
+pnpm dev
+# or
+bun dev
 ```
 
-Open http://localhost:3000/ with your browser to see your new project!
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-## 🤯🧐 What's inside?
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-This starter includes:
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-1. **NextJS** starter
-2. **TypeScript**
-3. **Supabase** _(Supabase authentication)_
-4. **ShadCN-UI**
-5. NextJS **Server Actions**
-6. **Tailwind CSS**
-7. **Zod**
+## Learn More
 
-## 👌 Features:
+To learn more about Next.js, take a look at the following resources:
 
-- Fully responsive to all screen sizes.
-- Built with TypeScript.
-- Fully Type Safe.
-- Secure use of Server actions.
-- User friendly UI with loading states.
-- Fully customizable.
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-## 📚 Learn more about NextJS
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-To learn more about NextJS, take a look at the following resources:
+## Deploy on Vercel
 
-- [NextJS Documentation](https://nextjs.org/docs) - learn more about NextJS features and API.
-- [Learn NextJS](https://nextjs.org/learn) - an interactive NextJS tutorial.
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
-You can checkout [the NextJS Github Repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome.
-
-## 📚 Learn more about Supabase
-
-To learn more about Supabase, take a look at the following resources:
-
-- [Supabase Documentation](https://supabase.com/docs) - learn more about Supabase features, API and Supabase SDK.
-- [Get Started with Supabase](https://supabase.com/docs/guides/getting-started) - get started with Supabase in a few minutes.
-- [NextJS with Supabase](https://supabase.com/docs/guides/getting-started/quickstarts/nextjs) - get familier working with supabase in NextJS.
-
-You can checkout [the Supabase Github Repository]() - your feedback and contributions are welcome.
-
-## 📚 Learn more about ShadCN-UI:
-
-To learn more about ShadCN-UI, take a look at the following resources:
-
-- [ShadCN Documentation](https://ui.shadcn.com/docs) - learn more about working with ShadCN-UI.
-- [ShadCN Themes](https://ui.shadcn.com/themes) - Get started with ShadCN themes.
-- [ShadCN-UI with NextJS](https://ui.shadcn.com/docs/installation/next) - learn how ShadCN-UI working with NextJS.
-
-You can checkout [the ShadCN-UI Github Repository](https://github.com/shadcn-ui/ui) - your feedback and contributions are welcome.
-
-## 📚 Learn more about Tailwind CSS:
-
-To learn more about Tailwind CSS, take a look at the following resources:
-
-- [Tailwind CSS Docs](https://tailwindcss.com/docs/installation) - learn more about Tailwind CSS.
-- [Tailwind with NextJS](https://tailwindcss.com/docs/guides/nextjs) - get started on working with Tailwind CSS in NextJS projects.
-- Join the Tailwind [Community](https://github.com/tailwindlabs/tailwindcss/discussions).
-
-You can checkout [the Tailwind CSS Github Repository](https://github.com/tailwindlabs/tailwindcss) - your feedback and contributions are welcome.
-
-## Author: Sahil Sharma (India)
-
-- [Portfolio](https://www.sahilsharma.online) - Visit my portfolio.
-- [Github](https://github.com/Sahil-Sharma-23) - View my Github profile.
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
