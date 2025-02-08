@@ -1,70 +1,75 @@
-'use client';
+"use client"
 
-import { useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { parseHashTokens } from '@/utils/auth';
+import { useState } from "react"
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 
 export default function LoginPage() {
-    const router = useRouter();
-    const searchParams = useSearchParams();
-    const nextUrl = searchParams.get('next') || '/dashboard';
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [error, setError] = useState("")
 
-    useEffect(() => {
-        const tokens = parseHashTokens(window.location.hash);
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault()
+    // Here you would typically call your API to handle login
+    console.log("Login:", { email, password })
+    // For demo purposes, let's just set an error if fields are empty
+    if (!email || !password) {
+      setError("Please fill in all fields")
+    } else {
+      setError("")
+      // Redirect or show success message
+    }
+  }
 
-        if (tokens) {
-            console.log('OAuth tokens found in URL hash, storing them...');
-
-            // Store tokens in localStorage
-            localStorage.setItem('supabase-token', tokens.accessToken);
-            localStorage.setItem('supabase-refresh-token', tokens.refreshToken);
-
-            // Store tokens in cookies via API
-            fetch('/api/auth', {
-                // Removed '/route' from the URL
-                method: 'POST',
-                body: JSON.stringify({
-                    accessToken: tokens.accessToken,
-                    refreshToken: tokens.refreshToken,
-                }),
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-            })
-                .then(async (response) => {
-                    if (!response.ok) {
-                        throw new Error('Failed to store tokens');
-                    }
-                    // Remove hash and redirect user
-                    window.history.replaceState(
-                        {},
-                        '',
-                        window.location.pathname
-                    );
-                    router.replace(nextUrl);
-                })
-                .catch((error) => {
-                    console.error('Error storing tokens:', error);
-                });
-        }
-    }, [router, nextUrl]);
-
-    const loginWithGoogle = () => {
-        const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-        const redirectUrl = encodeURIComponent(
-            window.location.origin + '/login'
-        );
-        window.location.href = `${baseUrl}/auth/v1/authorize?provider=google&redirect_to=${redirectUrl}`;
-    };
-
-    return (
-        <div className="flex flex-col items-center gap-4">
-            <h1>Login</h1>
-            <button
-                className="bg-blue-500 px-4 py-2 text-white rounded"
-                onClick={loginWithGoogle}
-            >
-                Login with Google
-            </button>
-        </div>
-    );
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-gray-100">
+      <Card className="w-[350px]">
+        <CardHeader>
+          <CardTitle>Log In</CardTitle>
+          <CardDescription>Enter your credentials to access your account</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="Enter your email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="Enter your password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+            <Button type="submit" className="w-full">
+              Log In
+            </Button>
+          </form>
+        </CardContent>
+        <CardFooter className="flex flex-col">
+          {error && <p className="text-red-500 text-sm mb-2">{error}</p>}
+          <p className="text-sm text-gray-600">
+            Don't have an account?{""}
+            <Link href="/signup" className="text-blue-500 hover:underline">
+              Sign up
+            </Link>
+          </p>
+        </CardFooter>
+      </Card>
+    </div>
+  )
 }
+
