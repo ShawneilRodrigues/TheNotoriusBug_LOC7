@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+streamlit
+langchain
+langchain-community
+langchain-core
+langchain-ollama
+pdfplumber
+shutils
