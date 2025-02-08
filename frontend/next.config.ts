@@ -8,15 +8,7 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true, // Disables ESLint errors during production builds
   },
-  async redirects() {
-    return [
-      {
-        source: '/',
-        destination: '/login',
-        permanent: false, // Temporary redirect to login page
-      },
-    ];
-  },
+  
   async headers() {
     return [
       {
