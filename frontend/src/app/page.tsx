@@ -2,31 +2,17 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { ArrowRight, MessageCircle, Shield, Users } from "lucide-react"
+import Navbar from "@/components/Navbar"
 
+// bg-gradient-to-b from-gray-50 to-white
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
-      <header className="container mx-auto px-4 py-6">
-        <nav className="flex items-center justify-between">
-          <div className="text-2xl font-bold text-gray-800">AISupportAgent</div>
-          <div className="space-x-4">
-            <Link href="/" className="text-gray-600 hover:text-gray-800">
-              Home
-            </Link>
-            <Link href="#features" className="text-gray-600 hover:text-gray-800">
-              Features
-            </Link>
-            <Link href="#contact" className="text-gray-600 hover:text-gray-800">
-              Contact Us
-            </Link>
-            <Link href="/login" className="text-gray-600 hover:text-gray-800">
-              Login
-            </Link>
-          </div>
-        </nav>
+    <div className="min-h-screen bg-blue-200">
+      <header className="min-w-full container mx-auto px-4 py-6">
+        <Navbar />
       </header>
 
-      <main className="container mx-auto px-4 py-12">
+      <main className="container rounded-t-[200px] bg-yellow-300 mx-auto px-4 py-12">
         <section className="text-center mb-20">
           <h1 className="text-5xl font-bold text-gray-900 mb-6">Your AI-Powered Enterprise Support Agent</h1>
           <p className="text-xl text-gray-600 mb-8">Empower your employees with instant, accurate support</p>

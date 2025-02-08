@@ -8,6 +8,7 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true, // Disables ESLint errors during production builds
   },
+
   async headers() {
     return [
       {
