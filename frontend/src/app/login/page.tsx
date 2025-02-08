@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { parseHashTokens } from '@/utils/auth';
+import ModeToggle from '@/components/ModeToggle';
 
 export default function LoginPage() {
     const router = useRouter();
@@ -59,6 +60,7 @@ export default function LoginPage() {
     return (
         <div className="flex flex-col items-center gap-4">
             <h1>Login</h1>
+            <ModeToggle />
             <button
                 className="bg-blue-500 px-4 py-2 text-white rounded"
                 onClick={loginWithGoogle}
