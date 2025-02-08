@@ -21,10 +21,10 @@ export default function LandingPage() {
                     smooth={true}
                 />
                 {/* ✅ Gradient Overlay Fix */}
-                <div className="w-screen h-screen absolute inset-0 z-10 bg-gradient-to-b from-transparent via-black/50 to-black opacity-100" />
+                <div className="w-screen h-screen absolute inset-0 -z-10 bg-gradient-to-b from-transparent via-black/50 to-black opacity-100" />
             </div>
 
-            <header className="w-screen mx-auto px-0 py-6 absolute z-20">
+            <header className="z-20 w-screen mx-auto px-0 py-6 absolute">
                 <Navbar />
             </header>
 
@@ -47,7 +47,7 @@ export default function LandingPage() {
                                     Your AI-Powered Enterprise Support Agent
                                 </div>
                             </h1>
-                            <p className="text-xl text-white mb-8">
+                            <p className="text-xl bg-blue-800/40 text-white mb-8">
                                 Empower your employees with instant, accurate
                                 support
                             </p>
@@ -76,12 +76,12 @@ export default function LandingPage() {
 
             <footer
                 id="contact"
-                className="w-screen bg-slate-200 py-8"
+                className="w-auto mx-20 mb-10 rounded-md bg-gray-950/90 py-6"
             >
-                <div className="container py-4 px-10 flex gap-10 mx-auto">
-                    <div className="flex items-center justify-between gap-8">
+                <div className="container flex-col px-10 flex gap-6">
+                    <div className="flex items-center justify-between gap-3">
                         <div>
-                            <h3 className="text-lg font-semibold mb-4">
+                            <h3 className="text-lg font-semibold">
                                 Contact Us
                             </h3>
                             <p className="text-gray-600">
@@ -92,52 +92,48 @@ export default function LandingPage() {
                             </p>
                         </div>
                         <div>
-                            <h3 className="text-lg font-semibold mb-4">
-                                Follow Us
-                            </h3>
+                            <h3 className="text-lg font-semibold">Follow Us</h3>
                             <div className="flex space-x-4">
                                 <a
                                     href="#"
-                                    className="text-gray-600 hover:text-gray-800"
+                                    className="text-gray-600 hover:text-blue-800"
                                 >
                                     Twitter
                                 </a>
                                 <a
                                     href="#"
-                                    className="text-gray-600 hover:text-gray-800"
+                                    className="text-gray-600 hover:text-blue-800"
                                 >
                                     LinkedIn
                                 </a>
                                 <a
                                     href="#"
-                                    className="text-gray-600 hover:text-gray-800"
+                                    className="text-gray-600 hover:text-blue-800"
                                 >
                                     Facebook
                                 </a>
                             </div>
                         </div>
                         <div>
-                            <h3 className="text-lg font-semibold mb-4">
-                                Legal
-                            </h3>
-                            <div className="flex flex-col space-y-2">
+                            <h3 className="text-lg font-semibold">Legal</h3>
+                            <div className="flex flex-col">
                                 <a
                                     href="#"
-                                    className="text-gray-600 hover:text-gray-800"
+                                    className="text-gray-600 hover:text-blue-800"
                                 >
                                     Privacy Policy
                                 </a>
                                 <a
                                     href="#"
-                                    className="text-gray-600 hover:text-gray-800"
+                                    className="text-gray-600 hover:text-blue-800"
                                 >
                                     Terms of Service
                                 </a>
                             </div>
                         </div>
                     </div>
-                    <div className="mt-8 flex justify-center text-center text-gray-600">
-                        <h5 className="w-[320px] bg-[#E0E1E6]">
+                    <div className="flex justify-center text-center text-gray-200">
+                        <h5 className="w-[320px] bg-blue-800/40">
                             © 2023 AISupportAgent. All rights reserved.
                         </h5>
                     </div>

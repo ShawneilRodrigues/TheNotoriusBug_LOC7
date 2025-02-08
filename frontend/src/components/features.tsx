@@ -14,7 +14,11 @@ export default function FeaturesSection() {
             y: 0,
             transition: { delay: index * 0.2, duration: 0.5, ease: 'easeOut' },
         }),
-        hover: { scale: 1.05, transition: { duration: 0.2 } },
+        hover: { 
+            scale: 1.1, 
+            boxShadow: '0px 10px 25px rgba(64, 121, 255, 0.4)', 
+            transition: { duration: 0.3 } 
+        }, // Glow effect with hover
     };
 
     const features = [
@@ -39,9 +43,14 @@ export default function FeaturesSection() {
     return (
         <section
             id="features"
-            className="md:flex flex-col items-center justify-center p-4 min-h-screen bg-black"
+            className="md:flex flex-col items-center justify-center p-4 h-[70vh] bg-gray-950/90 rounded-md mb-20 mx-20"
         >
-            <h2 className="text-4xl font-semibold text-center mb-16">
+            <motion.h2
+                initial={{ opacity: 0, y: -30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, ease: 'easeOut' }}
+                className="text-4xl font-semibold text-center mb-16"
+            >
                 <GradientText
                     colors={[
                         '#40ffaa',
@@ -55,9 +64,9 @@ export default function FeaturesSection() {
                 >
                     Features
                 </GradientText>
-            </h2>
+            </motion.h2>
 
-            <div className="grid w-full md:flex md:justify-between md:items-center grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="grid w-full md:flex md:justify-around md:items-center grid-cols-1 md:grid-cols-3 gap-10">
                 {features.map((feature, index) => (
                     <motion.div
                         key={index}
@@ -67,15 +76,20 @@ export default function FeaturesSection() {
                         whileHover="hover"
                         custom={index} // Stagger animation
                     >
-                        <Card className="bg-slate-200 flex items-center justify-center md:w-[300px] md:h-[250px] text-center shadow-md">
-                            <CardContent className="pt-6">
-                                <div className="flex items-center justify-center">
-                                    <feature.icon className="h-12 w-12 text-blue-500 mb-4" />
-                                </div>
-                                <h3 className="text-xl font-semibold mb-2">
+                        <Card className="bg-slate-200 flex flex-col items-center justify-center md:w-[320px] md:h-[280px] text-center shadow-lg transition-all duration-300 rounded-2xl p-6 border border-gray-300">
+                            <CardContent className="flex flex-col items-center">
+                                <motion.div
+                                    initial={{ scale: 0.8 }}
+                                    animate={{ scale: 1 }}
+                                    transition={{ duration: 0.4, ease: 'easeOut' }}
+                                    className="flex items-center justify-center"
+                                >
+                                    <feature.icon className="h-14 w-14 text-blue-500 mb-4" />
+                                </motion.div>
+                                <h3 className="text-2xl font-semibold mb-3 text-white">
                                     {feature.title}
                                 </h3>
-                                <p className="text-gray-600">
+                                <p className="text-gray-300 text-lg leading-relaxed">
                                     {feature.description}
                                 </p>
                             </CardContent>
