@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 export default function DashboardPage() {
     const router = useRouter();
     const [loading, setLoading] = useState(true);
-    const [userData, setUserData] = useState(null);
+    const [userData, setUserData] = useState<{ email: string } | null>(null);
 
     useEffect(() => {
         const verifyAuth = async () => {
