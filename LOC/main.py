@@ -1,4 +1,5 @@
 from fastapi import FastAPI, UploadFile, File, Form
+from fastapi.responses import FileResponse
 from fastapi import Query
 import shutil
 import tempfile
@@ -9,6 +10,7 @@ import os
 from rag_module.rag import process_pdf, query_rag
 from websearch.websearch import search_web
 from rag_module.video_summarizer import process_video
+from tts_module.text_to_speech import text_to_speech
 
 app = FastAPI()
 
@@ -70,3 +72,30 @@ def summarize_video(file: UploadFile = File(...), query: str = Form(...)):
 
     except Exception as e:
         return {"error": str(e)}
+
+
+# 📌 Text-to-Speech Endpoint
+@app.get("/translate-and-speak/")
+def translate_and_speak(text: str = Query(..., title="Text to Convert"), lang: str = Query("en", title="Target Language")):
+    """
+    Translates the given text into the specified language and generates speech.
+    
+    Returns:
+        - Translated text
+        - MP3 file containing speech
+    """
+    try:
+        translated_text, file_path = text_to_speech(text, lang)
+        return {
+            "translated_text": translated_text,
+            "audio_file": f"http://127.0.0.1:8000/download-audio/?file_path={file_path}"
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.get("/download-audio/")
+def download_audio(file_path: str):
+    """
+    Allows the user to download the generated MP3 file.
+    """
+    return FileResponse(file_path, media_type="audio/mpeg", filename=file_path.split("/")[-1])
