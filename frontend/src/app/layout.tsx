@@ -30,14 +30,20 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <ThemeProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-          >
-            {/* <Navbar /> */}
-            {children}
-          </ThemeProvider>
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {/* <Navbar /> */}
+          <div className="relative min-h-screen">
+            {/* Blurred Background */}
+            <div className="absolute inset-0 bg-black/20 backdrop-blur-sm z-[-1]" />
+
+            {/* Main Content */}
+            <main className="relative">{children}</main>
+          </div>
+        </ThemeProvider>
       </body>
     </html>
   );
