@@ -26,31 +26,91 @@ export default function LoginPage() {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(true);
 
-    // ✅ Auto-redirect if tokens exist
+    // 🔹 Function to check if a JWT token is expired
+    const isTokenExpired = (token: string) => {
+        try {
+            const payload = JSON.parse(atob(token.split('.')[1])); // Decode JWT
+            return payload.exp * 1000 < Date.now(); // Convert to milliseconds & compare
+        } catch (e) {
+            console.error('Error decoding JWT:', e);
+            return true; // Assume expired if decoding fails
+        }
+    };
+
+    // 🔹 Function to fetch the user's role and redirect accordingly
+    const fetchUserRole = async (token: string) => {
+        if (isTokenExpired(token)) {
+            console.log('Access token expired. Attempting refresh...');
+
+            try {
+                const response = await fetch('/api/auth/refresh', {
+                    method: 'GET',
+                    credentials: 'include',
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    localStorage.setItem('supabase-token', data.access_token);
+                    return fetchUserRole(data.access_token); // Retry with new token
+                } else {
+                    console.error(
+                        'Token refresh failed, redirecting to login...'
+                    );
+                    router.replace('/login');
+                    return;
+                }
+            } catch (error) {
+                console.error('Error during token refresh:', error);
+                router.replace('/login');
+                return;
+            }
+        }
+
+        const {
+            data: { user },
+            error,
+        } = await supabase.auth.getUser(token);
+
+        if (error || !user) {
+            console.error('Error fetching user role:', error);
+            return;
+        }
+
+        const role = user?.user_metadata?.role;
+        console.log('User Role:', role);
+
+        // Redirect based on role
+        if (role === 'admin') {
+            router.replace('/admin/dashboard');
+        } else {
+            router.replace('/employee/chat');
+        }
+    };
+
+    // 🔹 Effect to check authentication and refresh token if expired
     useEffect(() => {
         const checkAuth = async () => {
-            const accessToken = localStorage.getItem('supabase-token') || '';
+            let accessToken = localStorage.getItem('supabase-token') || '';
             const refreshToken =
                 localStorage.getItem('supabase-refresh-token') || '';
 
-            if (accessToken) {
+            if (accessToken && !isTokenExpired(accessToken)) {
                 fetchUserRole(accessToken);
                 return;
             }
 
-            if (!accessToken && refreshToken) {
+            if (refreshToken) {
                 try {
                     const response = await fetch('/api/auth/refresh', {
                         method: 'GET',
                         credentials: 'include',
                     });
+
                     if (response.ok) {
                         const data = await response.json();
-                        localStorage.setItem(
-                            'supabase-token',
-                            data.access_token
-                        );
-                        fetchUserRole(data.access_token);
+                        accessToken = data.access_token;
+                        localStorage.setItem('supabase-token', accessToken);
+                        fetchUserRole(accessToken);
                         return;
                     }
                 } catch (error) {
@@ -58,12 +118,14 @@ export default function LoginPage() {
                 }
             }
 
+            // If all fails, redirect to login
             setLoading(false);
         };
 
         checkAuth();
     }, [router]);
 
+    // 🔹 Effect to handle OAuth token extraction
     useEffect(() => {
         const tokens = parseHashTokens(window.location.hash);
 
@@ -103,28 +165,7 @@ export default function LoginPage() {
         }
     }, [router]);
 
-    const fetchUserRole = async (token: string) => {
-        const {
-            data: { user },
-            error,
-        } = await supabase.auth.getUser(token);
-
-        if (error || !user) {
-            console.error('Error fetching user role:', error);
-            return;
-        }
-
-        const role = user?.user_metadata?.role;
-        console.log('User Role:', role);
-
-        // Redirect based on role
-        if (role === 'admin') {
-            router.replace('/admin/dashboard');
-        } else {
-            router.replace('/employee/chat');
-        }
-    };
-
+    // 🔹 Login with email/password
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
@@ -143,6 +184,7 @@ export default function LoginPage() {
         fetchUserRole(data.session?.access_token || '');
     };
 
+    // 🔹 Login with Google OAuth
     const loginWithGoogle = () => {
         const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
         const redirectUrl = encodeURIComponent(

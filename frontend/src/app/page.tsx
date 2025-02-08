@@ -24,7 +24,7 @@ export default function LandingPage() {
                 <div className="w-screen h-screen absolute inset-0 z-10 bg-gradient-to-b from-transparent via-black/50 to-black opacity-100" />
             </div>
 
-            <header className="w-screen mx-auto px-0 py-6 absolute">
+            <header className="w-screen mx-auto px-0 py-6 absolute z-20">
                 <Navbar />
             </header>
 
