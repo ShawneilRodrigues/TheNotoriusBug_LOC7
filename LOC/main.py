@@ -11,6 +11,7 @@ from rag_module.rag import process_pdf, query_rag
 from websearch.websearch import search_web
 from rag_module.video_summarizer import process_video
 from tts_module.text_to_speech import text_to_speech
+from image_chat.image_chat import describe_image
 
 app = FastAPI()
 
@@ -99,3 +100,32 @@ def download_audio(file_path: str):
     Allows the user to download the generated MP3 file.
     """
     return FileResponse(file_path, media_type="audio/mpeg", filename=file_path.split("/")[-1])
+
+
+
+# 📌 Image Description Endpoint
+# Create a directory for storing images
+IMAGE_UPLOAD_FOLDER = "document_store/images/"
+os.makedirs(IMAGE_UPLOAD_FOLDER, exist_ok=True)
+
+@app.post("/describe-image/")
+async def upload_and_describe_image(file: UploadFile = File(...)):
+    """
+    Uploads an image and returns a description of its content.
+    """
+    try:
+        # Save the uploaded file
+        file_path = os.path.join(IMAGE_UPLOAD_FOLDER, file.filename)
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        # Process the image with AI model
+        description = describe_image(file_path)
+
+        # Cleanup (optional)
+        Path(file_path).unlink(missing_ok=True)
+
+        return {"description": description}
+
+    except Exception as e:
+        return {"error": str(e)}

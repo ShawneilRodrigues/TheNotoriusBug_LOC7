@@ -22,7 +22,7 @@ def describe_image(image_path: str) -> str:
     )
 
     # Get description from the AI model
-    response = agent.get_response(
+    response = agent.run(
         "Describe the content of the image.",
         images=[image_path],
     )
