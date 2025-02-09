@@ -14,6 +14,8 @@ from tools.image_chat import describe_image
 from tools.text2speech import text_to_speech
 from tools.graphdb import generate_cypher_query
 from tools.sms_agent import send_sms, SMSRequest
+from tools.jirasoda import create_jira_issue, escalate_if_frustrated, analyze_sentiment
+from tools.rag import query_rag, process_pdf
 # ✅ Initialize FastAPI
 app = FastAPI()
 
@@ -206,6 +208,63 @@ async def send_sms_endpoint(request: SMSRequest):
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
+@app.post("/analyze-sentiment/")
+async def analyze_sentiment_endpoint(text: str = Form(...)):
+    """
+    Analyze the sentiment of the given text.
+    """
+    try:
+        result = analyze_sentiment(text)
+        return JSONResponse(content=result)
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
+
+@app.post("/create-jira-issue/")
+async def create_jira_issue_endpoint(summary: str = Form(...), description: str = Form(...)):
+    """
+    Manually create a Jira issue.
+    """
+    try:
+        response = create_jira_issue(summary, description)
+        return JSONResponse(content={"message": "Jira Issue Created", "response": response})
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
+
+@app.post("/escalate-if-frustrated/")
+async def escalate_if_frustrated_endpoint(text: str = Form(...)):
+    """
+    Detect frustration and escalate to Jira if necessary.
+    """
+    try:
+        result = escalate_if_frustrated(text)
+        return JSONResponse(content={"result": result})
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
+@app.post("/process_pdf/")
+async def process_pdf_endpoint(request: str):
+    """
+    Endpoint to process a PDF from a given URL.
+    """
+    try:
+        chunks_processed = process_pdf(request)
+        return {"message": "PDF processed successfully", "chunks_processed": chunks_processed}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/query/")
+async def query_endpoint(request: str):
+    """
+    Endpoint to query the RAG system.
+    """
+    try:
+        response = query_rag(request)
+        return {"query": request.query, "response": response}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn
