@@ -16,6 +16,7 @@ import {
     CardTitle,
     CardFooter,
 } from '@/components/ui/card';
+import { storeUserInSupabase } from '../api/storeUserInSupabase';
 
 export default function LoginPage() {
     const router = useRouter();
@@ -41,26 +42,17 @@ export default function LoginPage() {
     const fetchUserRole = async (token: string) => {
         if (isTokenExpired(token)) {
             console.log('Access token expired. Attempting refresh...');
+            const response = await fetch('/api/auth/refresh', {
+                method: 'GET',
+                credentials: 'include',
+            });
 
-            try {
-                const response = await fetch('/api/auth/refresh', {
-                    method: 'GET',
-                    credentials: 'include',
-                });
-
-                if (response.ok) {
-                    const data = await response.json();
-                    localStorage.setItem('supabase-token', data.access_token);
-                    return fetchUserRole(data.access_token); // Retry with new token
-                } else {
-                    console.error(
-                        'Token refresh failed, redirecting to login...'
-                    );
-                    router.replace('/login');
-                    return;
-                }
-            } catch (error) {
-                console.error('Error during token refresh:', error);
+            if (response.ok) {
+                const data = await response.json();
+                localStorage.setItem('supabase-token', data.access_token);
+                return fetchUserRole(data.access_token);
+            } else {
+                console.error('Token refresh failed, redirecting to login...');
                 router.replace('/login');
                 return;
             }
@@ -76,94 +68,124 @@ export default function LoginPage() {
             return;
         }
 
-        const role = user?.user_metadata?.role;
+        const role = user?.user_metadata?.role || 'employee';
         console.log('User Role:', role);
 
-        // Redirect based on role
-        if (role === 'admin') {
-            router.replace('/admin/dashboard');
-        } else {
-            router.replace('/employee/chat');
+        // 🔹 Store user in Supabase database
+        await storeUserInSupabase({
+            id: user.id,
+            email: user.email,
+            name: user.user_metadata?.full_name || null,
+            phone_number: user.user_metadata?.phone_number || null,
+            role,
+            is_admin: role === 'admin',
+        });
+
+        // 🔹 Store authentication tokens
+        fetch('/api/auth', {
+            method: 'POST',
+            body: JSON.stringify({
+                accessToken: token,
+                refreshToken: localStorage.getItem('supabase-refresh-token'),
+                userId: user.id,
+                userEmail: user.email,
+                userRole: role,
+            }),
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+        }).then(() => {
+            router.replace(
+                role === 'admin' ? '/admin/dashboard' : '/employee/chat'
+            );
+        });
+    };
+
+    // 🔹 Function to refresh the access token
+    const refreshAccessToken = async () => {
+        const refreshToken = localStorage.getItem('supabase-refresh-token');
+        if (!refreshToken) {
+            console.log('No refresh token found, redirecting to login...');
+            setLoading(false);
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/auth/refresh', {
+                method: 'GET',
+                credentials: 'include',
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                localStorage.setItem('supabase-token', data.access_token);
+                fetchUserRole(data.access_token);
+            } else {
+                console.error('Token refresh failed, redirecting to login...');
+                setLoading(false);
+            }
+        } catch (error) {
+            console.error('Error refreshing session:', error);
+            setLoading(false);
         }
     };
 
     // 🔹 Effect to check authentication and refresh token if expired
     useEffect(() => {
+        if (typeof window === 'undefined') return; // Prevent SSR issues
+
         const checkAuth = async () => {
-            let accessToken = localStorage.getItem('supabase-token') || '';
-            const refreshToken =
-                localStorage.getItem('supabase-refresh-token') || '';
+            let accessToken = localStorage.getItem('supabase-token');
 
             if (accessToken && !isTokenExpired(accessToken)) {
-                fetchUserRole(accessToken);
+                await fetchUserRole(accessToken);
                 return;
             }
 
-            if (refreshToken) {
-                try {
-                    const response = await fetch('/api/auth/refresh', {
-                        method: 'GET',
-                        credentials: 'include',
-                    });
-
-                    if (response.ok) {
-                        const data = await response.json();
-                        accessToken = data.access_token;
-                        localStorage.setItem('supabase-token', accessToken);
-                        fetchUserRole(accessToken);
-                        return;
-                    }
-                } catch (error) {
-                    console.error('Error refreshing session:', error);
-                }
-            }
-
-            // If all fails, redirect to login
-            setLoading(false);
+            await refreshAccessToken();
         };
 
         checkAuth();
-    }, [router]);
+    }, []);
 
     // 🔹 Effect to handle OAuth token extraction
     useEffect(() => {
-        const tokens = parseHashTokens(window.location.hash);
+        if (typeof window === 'undefined') return; // Prevent SSR issues
 
-        if (tokens) {
-            console.log('OAuth tokens found in URL hash, storing them...');
+        const hash = window.location.hash;
+        if (!hash) return;
 
-            // Store tokens in localStorage
-            localStorage.setItem('supabase-token', tokens.accessToken);
-            localStorage.setItem('supabase-refresh-token', tokens.refreshToken);
+        const tokens = parseHashTokens(hash);
+        if (!tokens) return;
 
-            // Store tokens in cookies via API
-            fetch('/api/auth', {
-                method: 'POST',
-                body: JSON.stringify({
-                    accessToken: tokens.accessToken,
-                    refreshToken: tokens.refreshToken,
-                }),
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
+        console.log('OAuth tokens found in URL hash, storing them...');
+
+        // Store tokens in localStorage
+        localStorage.setItem('supabase-token', tokens.accessToken);
+        localStorage.setItem('supabase-refresh-token', tokens.refreshToken);
+
+        // Store tokens in cookies via API
+        fetch('/api/auth', {
+            method: 'POST',
+            body: JSON.stringify({
+                accessToken: tokens.accessToken,
+                refreshToken: tokens.refreshToken,
+            }),
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+        })
+            .then(async (response) => {
+                if (!response.ok) throw new Error('Failed to store tokens');
+
+                // Remove hash from URL
+                window.history.replaceState({}, '', window.location.pathname);
+
+                // Fetch user role and redirect accordingly
+                await fetchUserRole(tokens.accessToken);
             })
-                .then(async (response) => {
-                    if (!response.ok) throw new Error('Failed to store tokens');
-
-                    // Remove hash from URL
-                    window.history.replaceState(
-                        {},
-                        '',
-                        window.location.pathname
-                    );
-
-                    // Fetch user role and redirect accordingly
-                    fetchUserRole(tokens.accessToken);
-                })
-                .catch((error) => {
-                    console.error('Error storing tokens:', error);
-                });
-        }
-    }, [router]);
+            .catch((error) => {
+                console.error('Error storing tokens:', error);
+            });
+    }, []);
 
     // 🔹 Login with email/password
     const handleLogin = async (e: React.FormEvent) => {
@@ -246,27 +268,15 @@ export default function LoginPage() {
                     {error && (
                         <p className="text-red-500 text-sm mb-2">{error}</p>
                     )}
-
                     <div className="w-full text-center text-gray-600 my-2">
                         OR
                     </div>
-
                     <Button
                         className="w-full bg-red-500 text-white"
                         onClick={loginWithGoogle}
                     >
                         Sign in with Google
                     </Button>
-
-                    <p className="text-sm text-gray-600 mt-4">
-                        Don't have an account?{' '}
-                        <Link
-                            href="/signup"
-                            className="text-blue-500 hover:underline"
-                        >
-                            Sign up
-                        </Link>
-                    </p>
                 </CardFooter>
             </Card>
         </div>

@@ -16,6 +16,7 @@ import {
     Trash2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/utils/superbaseClient';
 
 export default function EmployeeChat() {
     const [mounted, setMounted] = useState(false);
@@ -27,21 +28,25 @@ export default function EmployeeChat() {
     const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
-
-    const [chats, setChats] = useState([
-        {
-            id: 1,
-            title: 'New Chat',
-            messages: [
-                { role: 'ai', content: 'Hello! How can I assist you today?' },
-            ],
-        },
-    ]);
-    const [activeChatId, setActiveChatId] = useState(1);
+    const [chats, setChats] = useState<
+        Array<{
+            id: number;
+            title: string;
+            messages: Array<{ role: string; content: string }>;
+        }>
+    >([]);
+    const [activeChatId, setActiveChatId] = useState<number | null>(null);
 
     useEffect(() => {
         setMounted(true);
+        fetchChats();
     }, []);
+
+    useEffect(() => {
+        if (activeChatId) {
+            fetchMessages(activeChatId);
+        }
+    }, [activeChatId]);
 
     useEffect(() => {
         scrollToBottom();
@@ -51,26 +56,154 @@ export default function EmployeeChat() {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
 
-    const activeChat = chats.find((chat) => chat.id === activeChatId);
+    const fetchChats = async () => {
+        const { data: chatsData, error } = await supabase
+            .from('chat')
+            .select('*')
+            .order('created_at', { ascending: false });
 
-    const handleChatSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (chatInput.trim() === '') return;
+        if (error) {
+            console.error('Error fetching chats:', error);
+            return;
+        }
 
-        const updatedChats = chats.map((chat) =>
-            chat.id === activeChatId
-                ? {
-                      ...chat,
-                      messages: [
-                          ...chat.messages,
-                          { role: 'user', content: chatInput },
-                      ],
-                  }
-                : chat
+        if (chatsData && chatsData.length > 0) {
+            const formattedChats = chatsData.map((chat) => ({
+                id: chat.id,
+                title: chat.name || 'New Chat',
+                messages: [],
+            }));
+            setChats(formattedChats);
+            setActiveChatId(chatsData[0].id);
+        } else {
+            createNewChat();
+        }
+    };
+
+    const fetchMessages = async (chatId: number) => {
+        const { data: messagesData, error } = await supabase
+            .from('messages')
+            .select('*')
+            .eq('chat_id', chatId)
+            .order('created_at', { ascending: true });
+
+        if (error) {
+            console.error('Error fetching messages:', error);
+            return;
+        }
+
+        setChats((prevChats) =>
+            prevChats.map((chat) =>
+                chat.id === chatId
+                    ? {
+                          ...chat,
+                          messages: messagesData.map((msg) => ({
+                              role: msg.is_bot ? 'ai' : 'user',
+                              content: msg.content || '',
+                          })),
+                      }
+                    : chat
+            )
         );
-        setChats(updatedChats);
+    };
 
-        setTimeout(() => {
+    const createNewChat = async () => {
+        const { data: newChat, error } = await supabase
+            .from('chat')
+            .insert([
+                { name: 'New Chat', created_at: new Date().toISOString() },
+            ])
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Error creating new chat:', error);
+            return;
+        }
+
+        const welcomeMessage = {
+            chat_id: newChat.id,
+            content: 'Hello! How can I assist you today?',
+            is_bot: true,
+            created_at: new Date().toISOString(),
+        };
+
+        const { error: messageError } = await supabase
+            .from('messages')
+            .insert([welcomeMessage]);
+
+        if (messageError) {
+            console.error('Error creating welcome message:', messageError);
+        }
+
+        setChats((prevChats) => [
+            ...prevChats,
+            {
+                id: newChat.id,
+                title: 'New Chat',
+                messages: [{ role: 'ai', content: welcomeMessage.content }],
+            },
+        ]);
+        setActiveChatId(newChat.id);
+    };
+
+    const handleChatSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!chatInput.trim() || !activeChatId) return;
+
+        // Save user message
+        const { error: userMessageError } = await supabase
+            .from('messages')
+            .insert([
+                {
+                    chat_id: activeChatId,
+                    content: chatInput,
+                    is_bot: false,
+                    created_at: new Date().toISOString(),
+                },
+            ]);
+
+        if (userMessageError) {
+            console.error('Error saving user message:', userMessageError);
+            return;
+        }
+
+        // Update UI immediately
+        setChats((prevChats) =>
+            prevChats.map((chat) =>
+                chat.id === activeChatId
+                    ? {
+                          ...chat,
+                          messages: [
+                              ...chat.messages,
+                              { role: 'user', content: chatInput },
+                          ],
+                      }
+                    : chat
+            )
+        );
+
+        setChatInput('');
+
+        // Simulate AI response
+        setTimeout(async () => {
+            const aiResponse = `You said: ${chatInput}`;
+            const { error: aiMessageError } = await supabase
+                .from('messages')
+                .insert([
+                    {
+                        chat_id: activeChatId,
+                        content: aiResponse,
+                        is_bot: true,
+                        created_at: new Date().toISOString(),
+                    },
+                ]);
+
+            if (aiMessageError) {
+                console.error('Error saving AI message:', aiMessageError);
+                return;
+            }
+
             setChats((prevChats) =>
                 prevChats.map((chat) =>
                     chat.id === activeChatId
@@ -78,50 +211,86 @@ export default function EmployeeChat() {
                               ...chat,
                               messages: [
                                   ...chat.messages,
-                                  { role: 'user', content: chatInput },
-                                  {
-                                      role: 'ai',
-                                      content: `You said: ${chatInput}`,
-                                  },
+                                  { role: 'ai', content: aiResponse },
                               ],
                           }
                         : chat
                 )
             );
         }, 1000);
-
-        setChatInput('');
     };
 
-    const deleteChat = (chatId: number) => {
+    const deleteChat = async (chatId: number) => {
+        // Delete all messages first
+        const { error: messagesError } = await supabase
+            .from('messages')
+            .delete()
+            .eq('chat_id', chatId);
+
+        if (messagesError) {
+            console.error('Error deleting messages:', messagesError);
+            return;
+        }
+
+        // Then delete the chat
+        const { error: chatError } = await supabase
+            .from('chat')
+            .delete()
+            .eq('id', chatId);
+
+        if (chatError) {
+            console.error('Error deleting chat:', chatError);
+            return;
+        }
+
         const updatedChats = chats.filter((chat) => chat.id !== chatId);
         setChats(updatedChats);
         if (chatId === activeChatId) {
-            setActiveChatId(updatedChats[0]?.id || 0);
+            setActiveChatId(updatedChats[0]?.id || null);
         }
     };
 
-    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || []);
         setUploadedFiles((prev) => [...prev, ...files]);
 
-        // Add file message to chat
-        const fileMessages = files.map((file) => ({
-            role: 'user' as const,
-            content: `Uploaded file: ${file.name}`,
-            attachment: file,
-        }));
+        for (const file of files) {
+            const { error: messageError } = await supabase
+                .from('messages')
+                .insert([
+                    {
+                        chat_id: activeChatId,
+                        content: `Uploaded file: ${file.name}`,
+                        is_bot: false,
+                        created_at: new Date().toISOString(),
+                        attachment: true,
+                        attachment_type: file.type,
+                        attachment_link: file.name, // You might want to implement actual file upload to storage
+                    },
+                ]);
 
-        setChats((prevChats) =>
-            prevChats.map((chat) =>
-                chat.id === activeChatId
-                    ? {
-                          ...chat,
-                          messages: [...chat.messages, ...fileMessages],
-                      }
-                    : chat
-            )
-        );
+            if (messageError) {
+                console.error('Error storing file message:', messageError);
+                continue;
+            }
+
+            setChats((prevChats) =>
+                prevChats.map((chat) =>
+                    chat.id === activeChatId
+                        ? {
+                              ...chat,
+                              messages: [
+                                  ...chat.messages,
+                                  {
+                                      role: 'user',
+                                      content: `Uploaded file: ${file.name}`,
+                                  },
+                              ],
+                          }
+                        : chat
+                )
+            );
+        }
     };
 
     const handleVoiceCommand = async () => {
@@ -131,43 +300,45 @@ export default function EmployeeChat() {
                     audio: true,
                 });
                 setIsRecording(true);
-                // Here you would typically start recording
-                // For demo purposes, we'll just toggle the state
             } catch (err) {
                 console.error('Error accessing microphone:', err);
             }
         } else {
             setIsRecording(false);
-            // Here you would typically stop recording and process the audio
-            // For demo purposes, we'll just add a message
-            const updatedChats = chats.map((chat) =>
-                chat.id === activeChatId
-                    ? {
-                          ...chat,
-                          messages: [
-                              ...chat.messages,
-                              {
-                                  role: 'user',
-                                  content: '🎤 Voice message recorded',
-                              },
-                          ],
-                      }
-                    : chat
-            );
-            setChats(updatedChats);
-        }
-    };
 
-    const createNewChat = () => {
-        const newChat = {
-            id: chats.length + 1,
-            title: 'New Chat',
-            messages: [
-                { role: 'ai', content: 'Hello! How can I assist you today?' },
-            ],
-        };
-        setChats([...chats, newChat]);
-        setActiveChatId(newChat.id);
+            const { error: messageError } = await supabase
+                .from('messages')
+                .insert([
+                    {
+                        chat_id: activeChatId,
+                        content: '🎤 Voice message recorded',
+                        is_bot: false,
+                        created_at: new Date().toISOString(),
+                    },
+                ]);
+
+            if (messageError) {
+                console.error('Error storing voice message:', messageError);
+                return;
+            }
+
+            setChats((prevChats) =>
+                prevChats.map((chat) =>
+                    chat.id === activeChatId
+                        ? {
+                              ...chat,
+                              messages: [
+                                  ...chat.messages,
+                                  {
+                                      role: 'user',
+                                      content: '🎤 Voice message recorded',
+                                  },
+                              ],
+                          }
+                        : chat
+                )
+            );
+        }
     };
 
     const startEditingChat = (chat: { id: number; title: string }) => {
@@ -175,16 +346,26 @@ export default function EmployeeChat() {
         setEditingTitle(chat.title);
     };
 
-    const saveEditingChat = () => {
-        if (editingTitle.trim()) {
-            setChats((prevChats) =>
-                prevChats.map((chat) =>
-                    chat.id === editingChatId
-                        ? { ...chat, title: editingTitle.trim() }
-                        : chat
-                )
-            );
+    const saveEditingChat = async () => {
+        if (!editingChatId || !editingTitle.trim()) return;
+
+        const { error } = await supabase
+            .from('chat')
+            .update({ name: editingTitle.trim() })
+            .eq('id', editingChatId);
+
+        if (error) {
+            console.error('Error updating chat title:', error);
+            return;
         }
+
+        setChats((prevChats) =>
+            prevChats.map((chat) =>
+                chat.id === editingChatId
+                    ? { ...chat, title: editingTitle.trim() }
+                    : chat
+            )
+        );
         setEditingChatId(null);
         setEditingTitle('');
     };
@@ -193,16 +374,14 @@ export default function EmployeeChat() {
         navigator.clipboard.writeText(text);
     };
 
-    if (!mounted) {
-        return null;
-    }
+    if (!mounted) return null;
 
     return (
         <div className="flex h-screen">
             {/* Sidebar */}
             <aside
                 className={cn(
-                    'absolute inset-y-0 left-0 z-50 w-[20vw] transform transition-transform duration-200 ease-in-out pt-12 bg-blue-950',
+                    'absolute inset-y-0 left-0 z-50 w-64 transform transition-transform duration-200 ease-in-out pt-12 bg-blue-950',
                     isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
                 )}
             >
@@ -306,38 +485,40 @@ export default function EmployeeChat() {
 
                 <main className="flex-1 bg-gradient-to-b from-blue-950/20 to-blue-900/20 overflow-y-auto p-4">
                     <div className="max-w-3xl mx-auto space-y-4">
-                        {activeChat?.messages.map((message, index) => (
-                            <div
-                                key={index}
-                                className={cn(
-                                    'flex items-center',
-                                    message.role === 'user'
-                                        ? 'justify-end'
-                                        : 'justify-start'
-                                )}
-                            >
+                        {chats
+                            .find((chat) => chat.id === activeChatId)
+                            ?.messages.map((message, index) => (
                                 <div
+                                    key={index}
                                     className={cn(
-                                        'max-w-[80%] rounded-lg p-4 shadow-lg border',
+                                        'flex items-center',
                                         message.role === 'user'
-                                            ? 'bg-primary text-primary-foreground border-primary/20'
-                                            : 'bg-card border-blue-800/30 backdrop-blur-sm'
+                                            ? 'justify-end'
+                                            : 'justify-start'
                                     )}
                                 >
-                                    {message.content}
+                                    <div
+                                        className={cn(
+                                            'max-w-[80%] rounded-lg p-4 shadow-lg border',
+                                            message.role === 'user'
+                                                ? 'bg-primary text-primary-foreground border-primary/20'
+                                                : 'bg-card border-blue-800/30 backdrop-blur-sm'
+                                        )}
+                                    >
+                                        {message.content}
+                                    </div>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="self-center transition-opacity ml-2"
+                                        onClick={() =>
+                                            copyToClipboard(message.content)
+                                        }
+                                    >
+                                        <Copy className="h-4 w-4" />
+                                    </Button>
                                 </div>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="self-center transition-opacity ml-2"
-                                    onClick={() =>
-                                        copyToClipboard(message.content)
-                                    }
-                                >
-                                    <Copy className="h-4 w-4" />
-                                </Button>
-                            </div>
-                        ))}
+                            ))}
                         <div ref={messagesEndRef} />
                     </div>
                 </main>
@@ -361,7 +542,7 @@ export default function EmployeeChat() {
                                 size="icon"
                                 onClick={() => fileInputRef.current?.click()}
                             >
-                                <Paperclip className="h-10 w-10" />
+                                <Paperclip className="h-5 w-5" />
                             </Button>
                             <Button
                                 type="button"
