@@ -17,6 +17,15 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/utils/superbaseClient';
 
+const employeeRoles = [
+    'HR',
+    'Marketing',
+    'Intern',
+    'Sales',
+    'Finance',
+    'Engineering',
+];
+
 export default function SignupPage() {
     const router = useRouter();
     const [isAdmin, setIsAdmin] = useState(true);
@@ -24,40 +33,14 @@ export default function SignupPage() {
     const [companyId, setCompanyId] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [role, setRole] = useState(employeeRoles[0]);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
-    // ✅ Auto-redirect if already authenticated
     useEffect(() => {
         const checkAuth = async () => {
             const accessToken = localStorage.getItem('supabase-token') || '';
-            const refreshToken =
-                localStorage.getItem('supabase-refresh-token') || '';
-
-            if (accessToken) {
-                fetchUserRole(accessToken);
-                return;
-            }
-
-            if (!accessToken && refreshToken) {
-                try {
-                    const response = await fetch('/api/auth/refresh', {
-                        method: 'GET',
-                        credentials: 'include',
-                    });
-                    if (response.ok) {
-                        const data = await response.json();
-                        localStorage.setItem(
-                            'supabase-token',
-                            data.access_token
-                        );
-                        fetchUserRole(data.access_token);
-                        return;
-                    }
-                } catch (error) {
-                    console.error('Error refreshing session:', error);
-                }
-            }
+            if (accessToken) fetchUserRole(accessToken);
         };
 
         const fetchUserRole = async (token: string) => {
@@ -66,10 +49,10 @@ export default function SignupPage() {
                 error,
             } = await supabase.auth.getUser(token);
             if (error || !user) return;
-
-            const role = user?.user_metadata?.role;
             router.replace(
-                role === 'admin' ? '/admin/dashboard' : '/employee/chat'
+                user.user_metadata?.role === 'admin'
+                    ? '/admin/dashboard'
+                    : '/employee/chat'
             );
         };
 
@@ -93,10 +76,9 @@ export default function SignupPage() {
         }
 
         try {
-            let companyID = companyId;
-
+            let finalCompanyId = companyId;
             if (isAdmin) {
-                companyID = `COMP-${Math.random()
+                finalCompanyId = `COMP-${Math.random()
                     .toString(36)
                     .substr(2, 6)
                     .toUpperCase()}`;
@@ -107,21 +89,44 @@ export default function SignupPage() {
                 password,
                 options: {
                     data: {
-                        role: isAdmin ? 'admin' : 'employee',
-                        companyId: companyID,
+                        role: isAdmin ? 'admin' : role,
+                        companyId: finalCompanyId,
+                        isAdmin: isAdmin,
                     },
                 },
             });
 
             if (error) throw error;
+            if (!data.user) throw new Error('Signup failed');
 
-            alert(
-                `Signup successful! ${
-                    isAdmin ? 'Your Company ID: ' + companyID : ''
-                }`
-            );
-
-            router.replace(isAdmin ? '/admin/dashboard' : '/employee/chat');
+            // Store user data in cookies
+            fetch('/api/auth', {
+                method: 'POST',
+                body: JSON.stringify({
+                    accessToken: data.session?.access_token,
+                    refreshToken: data.session?.refresh_token,
+                    userId: data.user.id,
+                    userEmail: data.user.email,
+                    userRole: isAdmin ? 'admin' : role,
+                    isAdmin: isAdmin,
+                    companyId: finalCompanyId,
+                }),
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+            })
+                .then(() => {
+                    alert(
+                        `Signup successful! ${
+                            isAdmin ? 'Your Company ID: ' + finalCompanyId : ''
+                        }`
+                    );
+                    router.replace(
+                        isAdmin ? '/admin/dashboard' : '/employee/chat'
+                    );
+                })
+                .catch((error) =>
+                    console.error('Error storing tokens:', error)
+                );
         } catch (err: any) {
             setError(err.message || 'Signup failed');
         }
@@ -132,6 +137,17 @@ export default function SignupPage() {
     const handleOAuthSignup = async (
         provider: 'google' | 'microsoft' | 'slack'
     ) => {
+        if (!companyId || !role) {
+            setError(
+                'Please enter a company ID and select a role before signing up.'
+            );
+            return;
+        }
+
+        // Store values locally before redirecting
+        localStorage.setItem('pending-company-id', companyId);
+        localStorage.setItem('pending-user-role', role);
+
         const redirectUrl = `${window.location.origin}/login`;
         const { error } = await supabase.auth.signInWithOAuth({
             provider,
@@ -188,20 +204,6 @@ export default function SignupPage() {
                                         }
                                     />
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="adminPassword">
-                                        Password
-                                    </Label>
-                                    <Input
-                                        id="adminPassword"
-                                        type="password"
-                                        placeholder="Enter your password"
-                                        value={password}
-                                        onChange={(e) =>
-                                            setPassword(e.target.value)
-                                        }
-                                    />
-                                </div>
                                 <Button
                                     type="submit"
                                     className="w-full"
@@ -232,30 +234,24 @@ export default function SignupPage() {
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="employeeEmail">Email</Label>
-                                    <Input
-                                        id="employeeEmail"
-                                        type="email"
-                                        placeholder="Enter your email"
-                                        value={email}
+                                    <Label htmlFor="role">Role</Label>
+                                    <select
+                                        id="role"
+                                        value={role}
                                         onChange={(e) =>
-                                            setEmail(e.target.value)
+                                            setRole(e.target.value)
                                         }
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="employeePassword">
-                                        Password
-                                    </Label>
-                                    <Input
-                                        id="employeePassword"
-                                        type="password"
-                                        placeholder="Enter your password"
-                                        value={password}
-                                        onChange={(e) =>
-                                            setPassword(e.target.value)
-                                        }
-                                    />
+                                        className="w-full border rounded-md p-2"
+                                    >
+                                        {employeeRoles.map((role) => (
+                                            <option
+                                                key={role}
+                                                value={role}
+                                            >
+                                                {role}
+                                            </option>
+                                        ))}
+                                    </select>
                                 </div>
                                 <Button
                                     type="submit"
@@ -271,45 +267,12 @@ export default function SignupPage() {
                     </Tabs>
                 </CardContent>
                 <CardFooter className="flex flex-col">
-                    {error && (
-                        <p className="text-red-500 text-sm mb-2">{error}</p>
-                    )}
-
-                    {!isAdmin && (
-                        <>
-                            <div className="w-full text-center text-gray-600 my-2">
-                                OR
-                            </div>
-                            <Button
-                                className="w-full bg-red-500"
-                                onClick={() => handleOAuthSignup('google')}
-                            >
-                                Sign Up with Google
-                            </Button>
-                            <Button
-                                className="w-full bg-blue-600 mt-2"
-                                onClick={() => handleOAuthSignup('microsoft')}
-                            >
-                                Sign Up with Microsoft (Mock)
-                            </Button>
-                            <Button
-                                className="w-full bg-gray-800 mt-2"
-                                onClick={() => handleOAuthSignup('slack')}
-                            >
-                                Sign Up with Slack (Mock)
-                            </Button>
-                        </>
-                    )}
-
-                    <p className="text-sm text-gray-600 mt-4">
-                        Already have an account?{' '}
-                        <Link
-                            href="/login"
-                            className="text-blue-500 hover:underline"
-                        >
-                            Log in
-                        </Link>
-                    </p>
+                    <Button
+                        className="w-full bg-red-500 text-white"
+                        onClick={() => handleOAuthSignup('google')}
+                    >
+                        Sign Up with Google
+                    </Button>
                 </CardFooter>
             </Card>
         </div>
