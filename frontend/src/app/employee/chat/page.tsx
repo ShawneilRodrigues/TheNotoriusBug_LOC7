@@ -165,24 +165,10 @@ export default function EmployeeChat() {
         e.preventDefault();
         if (!chatInput.trim() || !activeChatId) return;
 
-        // Save user message
-        const { error: userMessageError } = await supabase
-            .from('messages')
-            .insert([
-                {
-                    chat_id: activeChatId,
-                    content: chatInput,
-                    is_bot: false,
-                    created_at: new Date().toISOString(),
-                },
-            ]);
+        const userMessage = chatInput;
+        setChatInput('');
 
-        if (userMessageError) {
-            console.error('Error saving user message:', userMessageError);
-            return;
-        }
-
-        // Update UI immediately
+        // Update UI immediately with user message
         setChats((prevChats) =>
             prevChats.map((chat) =>
                 chat.id === activeChatId
@@ -190,34 +176,69 @@ export default function EmployeeChat() {
                           ...chat,
                           messages: [
                               ...chat.messages,
-                              { role: 'user', content: chatInput },
+                              { role: 'user', content: userMessage },
                           ],
                       }
                     : chat
             )
         );
 
-        setChatInput('');
+        try {
+            const formData = new FormData();
+            formData.append('text', userMessage);
 
-        // Simulate AI response
-        setTimeout(async () => {
-            const aiResponse = `You said: ${chatInput}`;
-            const { error: aiMessageError } = await supabase
-                .from('messages')
-                .insert([
-                    {
-                        chat_id: activeChatId,
-                        content: aiResponse,
-                        is_bot: true,
-                        created_at: new Date().toISOString(),
+            const response = await fetch(
+                'https://9f3e-103-139-247-63.ngrok-free.app/process-request/',
+                {
+                    method: 'POST',
+                    headers: {
+                        accept: 'application/json',
                     },
-                ]);
+                    body: formData,
+                }
+            );
 
-            if (aiMessageError) {
-                console.error('Error saving AI message:', aiMessageError);
-                return;
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
 
+            const data = await response.json();
+            console.log('Server response:', data); // Debug log
+
+            // Extract the response based on the action type
+            let aiResponse;
+            if (
+                data.action === 'image_description' &&
+                data.result?.description
+            ) {
+                aiResponse = data.result.description;
+            } else {
+                aiResponse =
+                    data.result?.response ||
+                    'Sorry, I could not process your request.';
+            }
+
+            // Save messages to database and update UI
+            const { error: dbError } = await supabase.from('messages').insert([
+                {
+                    chat_id: activeChatId,
+                    content: userMessage,
+                    is_bot: false,
+                    created_at: new Date().toISOString(),
+                },
+                {
+                    chat_id: activeChatId,
+                    content: aiResponse,
+                    is_bot: true,
+                    created_at: new Date().toISOString(),
+                },
+            ]);
+
+            if (dbError) {
+                console.error('Database error:', dbError);
+            }
+
+            // Update UI with AI response
             setChats((prevChats) =>
                 prevChats.map((chat) =>
                     chat.id === activeChatId
@@ -231,7 +252,25 @@ export default function EmployeeChat() {
                         : chat
                 )
             );
-        }, 1000);
+        } catch (error) {
+            console.error('Error:', error);
+            const errorMessage =
+                'Sorry, I encountered an error processing your request.';
+
+            setChats((prevChats) =>
+                prevChats.map((chat) =>
+                    chat.id === activeChatId
+                        ? {
+                              ...chat,
+                              messages: [
+                                  ...chat.messages,
+                                  { role: 'ai', content: errorMessage },
+                              ],
+                          }
+                        : chat
+                )
+            );
+        }
     };
 
     const deleteChat = async (chatId: number) => {
@@ -266,45 +305,154 @@ export default function EmployeeChat() {
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || []);
-        setUploadedFiles((prev) => [...prev, ...files]);
+        if (!files.length) return;
 
         for (const file of files) {
-            const { error: messageError } = await supabase
-                .from('messages')
-                .insert([
+            try {
+                // Show loading state
+                setChats((prevChats) =>
+                    prevChats.map((chat) =>
+                        chat.id === activeChatId
+                            ? {
+                                  ...chat,
+                                  messages: [
+                                      ...chat.messages,
+                                      {
+                                          role: 'user',
+                                          content: `Uploading file: ${file.name}...`,
+                                      },
+                                  ],
+                              }
+                            : chat
+                    )
+                );
+
+                // Create FormData
+                const formData = new FormData();
+
+                // Append file with original filename
+                formData.append('file', file);
+
+                // Add any text input if available
+                formData.append(
+                    'text',
+                    chatInput || 'Please analyze this file'
+                );
+
+                // Log the file details for debugging
+                console.log('Uploading file:', {
+                    name: file.name,
+                    type: file.type,
+                    size: file.size,
+                });
+
+                const response = await fetch(
+                    'https://9f3e-103-139-247-63.ngrok-free.app/process-request/',
                     {
-                        chat_id: activeChatId,
-                        content: `Uploaded file: ${file.name}`,
-                        is_bot: false,
-                        created_at: new Date().toISOString(),
-                        attachment: true,
-                        attachment_type: file.type,
-                        attachment_link: file.name, // You might want to implement actual file upload to storage
-                    },
-                ]);
+                        method: 'POST',
+                        body: formData,
+                    }
+                );
 
-            if (messageError) {
-                console.error('Error storing file message:', messageError);
-                continue;
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Server response:', errorText);
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                console.log('Server response:', data); // Debug log
+
+                // Extract the response based on the action type
+                let aiResponse;
+                if (
+                    data.action === 'image_description' &&
+                    data.result?.description
+                ) {
+                    aiResponse = data.result.description;
+                } else {
+                    aiResponse =
+                        data.result?.response ||
+                        `Could not process file: ${file.name}`;
+                }
+
+                // Save to database and update UI
+                const { error: dbError } = await supabase
+                    .from('messages')
+                    .insert([
+                        {
+                            chat_id: activeChatId,
+                            content: `File uploaded: ${file.name}`,
+                            is_bot: false,
+                            created_at: new Date().toISOString(),
+                            attachment: true,
+                            attachment_type: file.type,
+                            attachment_link: file.name,
+                        },
+                        {
+                            chat_id: activeChatId,
+                            content: aiResponse,
+                            is_bot: true,
+                            created_at: new Date().toISOString(),
+                        },
+                    ]);
+
+                // Update UI
+                setChats((prevChats) =>
+                    prevChats.map((chat) =>
+                        chat.id === activeChatId
+                            ? {
+                                  ...chat,
+                                  messages: [
+                                      ...chat.messages.filter(
+                                          (m) =>
+                                              !m.content.includes(
+                                                  'Uploading file'
+                                              )
+                                      ),
+                                      {
+                                          role: 'user',
+                                          content: `File uploaded: ${file.name}`,
+                                      },
+                                      {
+                                          role: 'ai',
+                                          content: aiResponse,
+                                      },
+                                  ],
+                              }
+                            : chat
+                    )
+                );
+            } catch (error) {
+                console.error('Error details:', error);
+                const errorMessage = `Failed to process file: ${file.name}. Please try again or contact support.`;
+
+                setChats((prevChats) =>
+                    prevChats.map((chat) =>
+                        chat.id === activeChatId
+                            ? {
+                                  ...chat,
+                                  messages: [
+                                      ...chat.messages.filter(
+                                          (m) =>
+                                              !m.content.includes(
+                                                  'Uploading file'
+                                              )
+                                      ),
+                                      { role: 'ai', content: errorMessage },
+                                  ],
+                              }
+                            : chat
+                    )
+                );
             }
-
-            setChats((prevChats) =>
-                prevChats.map((chat) =>
-                    chat.id === activeChatId
-                        ? {
-                              ...chat,
-                              messages: [
-                                  ...chat.messages,
-                                  {
-                                      role: 'user',
-                                      content: `Uploaded file: ${file.name}`,
-                                  },
-                              ],
-                          }
-                        : chat
-                )
-            );
         }
+
+        // Clear the file input and chat input after processing
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+        setChatInput('');
     };
 
     const handleVoiceCommand = async () => {
@@ -367,7 +515,6 @@ export default function EmployeeChat() {
                                     ? {
                                           ...chat,
                                           messages: [
-                                              ...chat.messages,
                                               {
                                                   role: 'user',
                                                   content: `🎤 Voice Message`,
