@@ -36,6 +36,9 @@ export default function EmployeeChat() {
         }>
     >([]);
     const [activeChatId, setActiveChatId] = useState<number | null>(null);
+    const [mediaRecorderRef, setMediaRecorderRef] =
+        useState<MediaRecorder | null>(null);
+    const [streamRef, setStreamRef] = useState<MediaStream | null>(null);
 
     useEffect(() => {
         setMounted(true);
@@ -51,6 +54,17 @@ export default function EmployeeChat() {
     useEffect(() => {
         scrollToBottom();
     }, [chats]);
+
+    useEffect(() => {
+        return () => {
+            if (streamRef) {
+                streamRef.getTracks().forEach((track) => track.stop());
+            }
+            if (mediaRecorderRef && isRecording) {
+                mediaRecorderRef.stop();
+            }
+        };
+    }, [streamRef, mediaRecorderRef, isRecording]);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -294,50 +308,103 @@ export default function EmployeeChat() {
     };
 
     const handleVoiceCommand = async () => {
-        if (!isRecording) {
+        if (!isRecording && !mediaRecorderRef) {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
                     audio: true,
                 });
+                setStreamRef(stream);
+
+                const mediaRecorder = new MediaRecorder(stream);
+                const audioChunks: BlobPart[] = [];
+
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                    }
+                };
+
+                mediaRecorder.onstop = async () => {
+                    try {
+                        const audioBlob = new Blob(audioChunks, {
+                            type: 'audio/webm',
+                        });
+                        const fileName = `voice_${Date.now()}.webm`;
+
+                        // Simpler upload without RLS checks
+                        const { data, error: uploadError } =
+                            await supabase.storage
+                                .from('files')
+                                .upload(fileName, audioBlob, {
+                                    contentType: 'audio/webm',
+                                });
+
+                        if (uploadError) {
+                            throw uploadError;
+                        }
+
+                        const { data: urlData } = supabase.storage
+                            .from('files')
+                            .getPublicUrl(fileName);
+
+                        // Save to messages
+                        await supabase.from('messages').insert([
+                            {
+                                chat_id: activeChatId,
+                                content: `🎤 Voice Message`,
+                                is_bot: false,
+                                created_at: new Date().toISOString(),
+                                attachment: true,
+                                attachment_type: 'audio/webm',
+                                attachment_link: urlData.publicUrl,
+                            },
+                        ]);
+
+                        // Update UI
+                        setChats((prevChats) =>
+                            prevChats.map((chat) =>
+                                chat.id === activeChatId
+                                    ? {
+                                          ...chat,
+                                          messages: [
+                                              ...chat.messages,
+                                              {
+                                                  role: 'user',
+                                                  content: `🎤 Voice Message`,
+                                                  attachment_type: 'audio/webm',
+                                                  attachment_link:
+                                                      urlData.publicUrl,
+                                              },
+                                          ],
+                                      }
+                                    : chat
+                            )
+                        );
+                    } catch (error) {
+                        console.error('Upload error:', error);
+                        alert('Failed to upload voice message');
+                    } finally {
+                        if (streamRef) {
+                            streamRef
+                                .getTracks()
+                                .forEach((track) => track.stop());
+                            setStreamRef(null);
+                        }
+                        setMediaRecorderRef(null);
+                        setIsRecording(false);
+                    }
+                };
+
+                setMediaRecorderRef(mediaRecorder);
+                mediaRecorder.start();
                 setIsRecording(true);
             } catch (err) {
-                console.error('Error accessing microphone:', err);
+                console.error('Microphone error:', err);
+                alert('Could not access microphone');
             }
-        } else {
+        } else if (isRecording && mediaRecorderRef) {
+            mediaRecorderRef.stop();
             setIsRecording(false);
-
-            const { error: messageError } = await supabase
-                .from('messages')
-                .insert([
-                    {
-                        chat_id: activeChatId,
-                        content: '🎤 Voice message recorded',
-                        is_bot: false,
-                        created_at: new Date().toISOString(),
-                    },
-                ]);
-
-            if (messageError) {
-                console.error('Error storing voice message:', messageError);
-                return;
-            }
-
-            setChats((prevChats) =>
-                prevChats.map((chat) =>
-                    chat.id === activeChatId
-                        ? {
-                              ...chat,
-                              messages: [
-                                  ...chat.messages,
-                                  {
-                                      role: 'user',
-                                      content: '🎤 Voice message recorded',
-                                  },
-                              ],
-                          }
-                        : chat
-                )
-            );
         }
     };
 
