@@ -199,7 +199,7 @@ export default function EmployeeChat() {
 
     return (
         <div className="flex h-screen">
-            {/* Sidebar */}
+            {/* Sidebar */} 
             <aside
                 className={cn(
                     'absolute inset-y-0 left-0 z-50 w-[20vw] transform transition-transform duration-200 ease-in-out pt-12 bg-blue-950',
