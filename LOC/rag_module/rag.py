@@ -1,22 +1,33 @@
 from langchain_community.document_loaders import PDFPlumberLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.vectorstores import InMemoryVectorStore
-from langchain_ollama import OllamaEmbeddings
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_ollama.llms import OllamaLLM
+from langchain_google_genai import ChatGoogleGenerativeAI
+import google.generativeai as genai
+import os
+from dotenv import load_dotenv
+from sentence_transformers import SentenceTransformer
+load_dotenv()
+# Initialize Gemini API
+os.environ['GOOGLE_API_KEY'] = os.environ.get('GOOGLE_API_KEY')  # Replace with your actual API key
+genai.configure(api_key=os.environ['GOOGLE_API_KEY'])
 
-EMBEDDING_MODEL = OllamaEmbeddings(model="deepseek-r1:1.5b")
+# Setup models
+EMBEDDING_MODEL = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+#EMBEDDING_MODEL = SentenceTransformer('all-MiniLM-L6-v2')
 DOCUMENT_VECTOR_DB = InMemoryVectorStore(EMBEDDING_MODEL)
-LANGUAGE_MODEL = OllamaLLM(model="deepseek-r1:1.5b")
+LANGUAGE_MODEL = ChatGoogleGenerativeAI(model="gemini-2.0-flash-exp", temperature=0)
 
 PROMPT_TEMPLATE = """
 You are an expert research assistant. Use the provided context to answer the query. 
 If unsure, state that you don't know. Be concise and factual (max 3 sentences).
 
-Query: {user_query} 
-Context: {document_context} 
-Answer:
-"""
+Query: {user_query}
+
+Context: {document_context}
+
+Answer: """
 
 def process_pdf(file_path):
     document_loader = PDFPlumberLoader(file_path)
