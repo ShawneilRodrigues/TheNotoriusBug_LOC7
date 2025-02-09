@@ -25,7 +25,7 @@ def create_jira_issue(summary, description):
     toolkit = JiraToolkit.from_jira_api_wrapper(jira)
     agent = initialize_agent(toolkit.get_tools(), llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose=True)
     
-    response = agent.run(f"Create a new issue in project NOTR with the summary '{summary}' and description '{description}'. Issue-type 'Bug'")
+    response = agent.run(f"Create a new issue in project NOTR with the summary '{summary}' and description '{description}'. Issue-type Epic")
     return response
 
 def escalate_if_frustrated(text):
