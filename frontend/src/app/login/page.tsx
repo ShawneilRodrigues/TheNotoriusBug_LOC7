@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/utils/superbaseClient';
-import { parseHashTokens } from '@/utils/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,211 +15,164 @@ import {
     CardTitle,
     CardFooter,
 } from '@/components/ui/card';
-import { storeUserInSupabase } from '../api/storeUserInSupabase';
+import { storeUserInSupabase } from '@/app/api/storeUserInSupabase';
 
 export default function LoginPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const nextUrl = searchParams.get('next') || '/dashboard'; // Default redirect
+    const nextUrl = searchParams.get('next') || '/dashboard';
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
+    const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
-    // 🔹 Function to check if a JWT token is expired
-    const isTokenExpired = (token: string) => {
-        try {
-            const payload = JSON.parse(atob(token.split('.')[1])); // Decode JWT
-            return payload.exp * 1000 < Date.now(); // Convert to milliseconds & compare
-        } catch (e) {
-            console.error('Error decoding JWT:', e);
-            return true; // Assume expired if decoding fails
-        }
-    };
-
-    // 🔹 Function to fetch the user's role and redirect accordingly
-    const fetchUserRole = async (token: string) => {
-        if (isTokenExpired(token)) {
-            console.log('Access token expired. Attempting refresh...');
-            const response = await fetch('/api/auth/refresh', {
-                method: 'GET',
-                credentials: 'include',
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                localStorage.setItem('supabase-token', data.access_token);
-                return fetchUserRole(data.access_token);
-            } else {
-                console.error('Token refresh failed, redirecting to login...');
-                router.replace('/login');
-                return;
-            }
-        }
-
-        const {
-            data: { user },
-            error,
-        } = await supabase.auth.getUser(token);
-
-        if (error || !user) {
-            console.error('Error fetching user role:', error);
-            return;
-        }
-
-        const role = user?.user_metadata?.role || 'employee';
-        console.log('User Role:', role);
-
-        // 🔹 Store user in Supabase database
-        await storeUserInSupabase({
-            id: user.id,
-            email: user.email,
-            name: user.user_metadata?.full_name || null,
-            phone_number: user.user_metadata?.phone_number || null,
-            role,
-            is_admin: role === 'admin',
-        });
-
-        // 🔹 Store authentication tokens
-        fetch('/api/auth', {
-            method: 'POST',
-            body: JSON.stringify({
-                accessToken: token,
-                refreshToken: localStorage.getItem('supabase-refresh-token'),
-                userId: user.id,
-                userEmail: user.email,
-                userRole: role,
-            }),
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-        }).then(() => {
-            router.replace(
-                role === 'admin' ? '/admin/dashboard' : '/employee/chat'
-            );
-        });
-    };
-
-    // 🔹 Function to refresh the access token
-    const refreshAccessToken = async () => {
-        const refreshToken = localStorage.getItem('supabase-refresh-token');
-        if (!refreshToken) {
-            console.log('No refresh token found, redirecting to login...');
-            setLoading(false);
-            return;
-        }
-
-        try {
-            const response = await fetch('/api/auth/refresh', {
-                method: 'GET',
-                credentials: 'include',
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                localStorage.setItem('supabase-token', data.access_token);
-                fetchUserRole(data.access_token);
-            } else {
-                console.error('Token refresh failed, redirecting to login...');
-                setLoading(false);
-            }
-        } catch (error) {
-            console.error('Error refreshing session:', error);
-            setLoading(false);
-        }
-    };
-
-    // 🔹 Effect to check authentication and refresh token if expired
+    // Simplified session check
     useEffect(() => {
-        if (typeof window === 'undefined') return; // Prevent SSR issues
+        const checkSession = async () => {
+            try {
+                const {
+                    data: { session },
+                    error,
+                } = await supabase.auth.getSession();
 
-        const checkAuth = async () => {
-            let accessToken = localStorage.getItem('supabase-token');
+                if (error) throw error;
 
-            if (accessToken && !isTokenExpired(accessToken)) {
-                await fetchUserRole(accessToken);
-                return;
+                if (session) {
+                    const {
+                        data: { user },
+                        error: userError,
+                    } = await supabase.auth.getUser();
+                    if (userError) throw userError;
+
+                    if (user) {
+                        const role = user.user_metadata?.role || 'employee';
+                        router.replace(
+                            role === 'admin'
+                                ? '/admin/dashboard'
+                                : '/employee/chat'
+                        );
+                        return;
+                    }
+                }
+            } catch (err) {
+                console.error('Session check error:', err);
+            } finally {
+                setIsCheckingAuth(false);
             }
-
-            await refreshAccessToken();
         };
 
-        checkAuth();
-    }, []);
+        checkSession();
+    }, [router]);
 
-    // 🔹 Effect to handle OAuth token extraction
-    useEffect(() => {
-        if (typeof window === 'undefined') return; // Prevent SSR issues
-
-        const hash = window.location.hash;
-        if (!hash) return;
-
-        const tokens = parseHashTokens(hash);
-        if (!tokens) return;
-
-        console.log('OAuth tokens found in URL hash, storing them...');
-
-        // Store tokens in localStorage
-        localStorage.setItem('supabase-token', tokens.accessToken);
-        localStorage.setItem('supabase-refresh-token', tokens.refreshToken);
-
-        // Store tokens in cookies via API
-        fetch('/api/auth', {
-            method: 'POST',
-            body: JSON.stringify({
-                accessToken: tokens.accessToken,
-                refreshToken: tokens.refreshToken,
-            }),
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-        })
-            .then(async (response) => {
-                if (!response.ok) throw new Error('Failed to store tokens');
-
-                // Remove hash from URL
-                window.history.replaceState({}, '', window.location.pathname);
-
-                // Fetch user role and redirect accordingly
-                await fetchUserRole(tokens.accessToken);
-            })
-            .catch((error) => {
-                console.error('Error storing tokens:', error);
-            });
-    }, []);
-
-    // 🔹 Login with email/password
+    // Handle login
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
+        setLoading(true);
 
-        const { data, error } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-        });
+        try {
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+            });
 
-        if (error) {
-            setError(error.message);
-            return;
+            if (error) throw error;
+
+            if (data.session && data.user) {
+                const role = data.user.user_metadata?.role || 'employee';
+                const companyId = data.user.user_metadata?.company_id;
+
+                if (!companyId) {
+                    throw new Error('No company ID found in user metadata');
+                }
+
+                console.log('Storing user data after login:', {
+                    id: data.user.id,
+                    email: data.user.email,
+                    role,
+                    companyId: companyId.toString(),
+                    isAdmin: role === 'admin',
+                });
+
+                // Store user data in Supabase
+                const { success, error: storeError } =
+                    await storeUserInSupabase({
+                        id: data.user.id,
+                        email: data.user.email || '',
+                        role,
+                        companyId: companyId.toString(),
+                        isAdmin: role === 'admin',
+                        name: data.user.user_metadata?.full_name,
+                        phoneNumber: data.user.phone || null,
+                    });
+
+                if (!success) {
+                    console.error('Failed to store user data:', storeError);
+                    throw storeError;
+                }
+
+                // Set auth cookies
+                const response = await fetch('/api/auth', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        accessToken: data.session.access_token,
+                        refreshToken: data.session.refresh_token,
+                        userId: data.user.id,
+                        userEmail: data.user.email,
+                        userRole: role,
+                        isAdmin: role === 'admin',
+                        companyId,
+                    }),
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to set authentication cookies');
+                }
+
+                router.replace(
+                    role === 'admin' ? '/admin/dashboard' : '/employee/chat'
+                );
+            }
+        } catch (err: any) {
+            setError(err.message || 'Login failed');
+            console.error('Login error:', err);
+        } finally {
+            setLoading(false);
         }
-
-        console.log('Login successful:', data);
-        fetchUserRole(data.session?.access_token || '');
     };
 
-    // 🔹 Login with Google OAuth
-    const loginWithGoogle = () => {
-        const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-        const redirectUrl = encodeURIComponent(
-            window.location.origin + '/login'
-        );
-        window.location.href = `${baseUrl}/auth/v1/authorize?provider=google&redirect_to=${redirectUrl}`;
+    // Handle OAuth login
+    const loginWithGoogle = async () => {
+        try {
+            setError('');
+            const { error } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    redirectTo: `${window.location.origin}/login`,
+                    queryParams: {
+                        access_type: 'offline',
+                        prompt: 'consent',
+                    },
+                },
+            });
+
+            if (error) throw error;
+        } catch (err: any) {
+            setError(err.message || 'Failed to login with Google');
+            console.error('Google login error:', err);
+        }
     };
 
-    if (loading)
+    if (isCheckingAuth) {
         return (
             <div className="flex items-center justify-center min-h-screen">
-                Checking authentication...
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
             </div>
         );
+    }
 
     return (
         <div className="flex items-center justify-center min-h-screen bg-gray-100">
@@ -259,24 +211,28 @@ export default function LoginPage() {
                         <Button
                             type="submit"
                             className="w-full"
+                            disabled={loading}
                         >
-                            Log In
+                            {loading ? 'Logging in...' : 'Log In'}
                         </Button>
                     </form>
                 </CardContent>
-                <CardFooter className="flex flex-col">
-                    {error && (
-                        <p className="text-red-500 text-sm mb-2">{error}</p>
-                    )}
-                    <div className="w-full text-center text-gray-600 my-2">
-                        OR
-                    </div>
+                <CardFooter className="flex flex-col gap-4">
+                    {error && <p className="text-red-500 text-sm">{error}</p>}
                     <Button
-                        className="w-full bg-red-500 text-white"
+                        type="button"
+                        className="w-full bg-red-500 hover:bg-red-600 text-white"
                         onClick={loginWithGoogle}
+                        disabled={loading}
                     >
                         Sign in with Google
                     </Button>
+                    <Link
+                        href="/signup"
+                        className="text-sm text-center w-full text-gray-600 hover:text-gray-800"
+                    >
+                        Don't have an account? Sign up
+                    </Link>
                 </CardFooter>
             </Card>
         </div>

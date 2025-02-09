@@ -303,13 +303,38 @@ export default function EmployeeChat() {
         }
     };
 
+    const getFileTypeCategory = (file: File): string => {
+        const type = file.type.toLowerCase();
+        if (type.startsWith('image/')) return 'image';
+        if (type.startsWith('audio/')) return 'audio';
+        if (type.startsWith('video/')) return 'video';
+        if (type.startsWith('application/pdf')) return 'pdf';
+        if (
+            type.includes('document') ||
+            type.includes('sheet') ||
+            type.includes('presentation')
+        )
+            return 'document';
+        if (type.startsWith('text/')) return 'text';
+        return 'other';
+    };
+
+    const formatFileSize = (bytes: number): string => {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    };
+
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || []);
         if (!files.length) return;
 
         for (const file of files) {
             try {
-                // Show loading state
+                // Show loading state with file info
+                const fileSize = formatFileSize(file.size);
+                const fileType = getFileTypeCategory(file);
+
                 setChats((prevChats) =>
                     prevChats.map((chat) =>
                         chat.id === activeChatId
@@ -319,7 +344,7 @@ export default function EmployeeChat() {
                                       ...chat.messages,
                                       {
                                           role: 'user',
-                                          content: `Uploading file: ${file.name}...`,
+                                          content: `Uploading ${fileType} file: ${file.name} (${fileSize})...`,
                                       },
                                   ],
                               }
@@ -327,23 +352,23 @@ export default function EmployeeChat() {
                     )
                 );
 
-                // Create FormData
+                // Create FormData with additional metadata
                 const formData = new FormData();
-
-                // Append file with original filename
                 formData.append('file', file);
-
-                // Add any text input if available
+                formData.append('file_type', fileType);
+                formData.append('file_name', file.name);
+                formData.append('file_size', file.size.toString());
                 formData.append(
                     'text',
-                    chatInput || 'Please analyze this file'
+                    chatInput || `Please analyze this ${fileType} file`
                 );
 
-                // Log the file details for debugging
+                // Log file details for debugging
                 console.log('Uploading file:', {
                     name: file.name,
                     type: file.type,
-                    size: file.size,
+                    category: fileType,
+                    size: fileSize,
                 });
 
                 const response = await fetch(
@@ -361,28 +386,40 @@ export default function EmployeeChat() {
                 }
 
                 const data = await response.json();
-                console.log('Server response:', data); // Debug log
+                console.log('Server response:', data);
 
-                // Extract the response based on the action type
+                // Extract response based on file type and action
                 let aiResponse;
                 if (
                     data.action === 'image_description' &&
                     data.result?.description
                 ) {
                     aiResponse = data.result.description;
+                } else if (
+                    data.action === 'document_analysis' &&
+                    data.result?.text
+                ) {
+                    aiResponse = data.result.text;
+                } else if (
+                    data.action === 'audio_transcription' &&
+                    data.result?.transcript
+                ) {
+                    aiResponse = data.result.transcript;
                 } else {
                     aiResponse =
                         data.result?.response ||
-                        `Could not process file: ${file.name}`;
+                        `Analysis of ${file.name}: ${
+                            data.result?.summary || 'No summary available'
+                        }`;
                 }
 
-                // Save to database and update UI
+                // Save to database using existing columns
                 const { error: dbError } = await supabase
                     .from('messages')
                     .insert([
                         {
                             chat_id: activeChatId,
-                            content: `File uploaded: ${file.name}`,
+                            content: `File uploaded: ${file.name} (${fileSize}) - Type: ${fileType}`,
                             is_bot: false,
                             created_at: new Date().toISOString(),
                             attachment: true,
@@ -397,7 +434,12 @@ export default function EmployeeChat() {
                         },
                     ]);
 
-                // Update UI
+                if (dbError) {
+                    console.error('Database error:', dbError);
+                    throw dbError;
+                }
+
+                // Update UI with success message and response
                 setChats((prevChats) =>
                     prevChats.map((chat) =>
                         chat.id === activeChatId
@@ -406,13 +448,13 @@ export default function EmployeeChat() {
                                   messages: [
                                       ...chat.messages.filter(
                                           (m) =>
-                                              !m.content.includes(
-                                                  'Uploading file'
-                                              )
+                                              !m.content.includes('Uploading')
                                       ),
                                       {
                                           role: 'user',
-                                          content: `File uploaded: ${file.name}`,
+                                          content: `File uploaded: ${file.name} (${fileSize}) - Type: ${fileType}`,
+                                          attachment_type: file.type,
+                                          attachment_link: file.name,
                                       },
                                       {
                                           role: 'ai',
@@ -435,9 +477,7 @@ export default function EmployeeChat() {
                                   messages: [
                                       ...chat.messages.filter(
                                           (m) =>
-                                              !m.content.includes(
-                                                  'Uploading file'
-                                              )
+                                              !m.content.includes('Uploading')
                                       ),
                                       { role: 'ai', content: errorMessage },
                                   ],

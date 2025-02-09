@@ -1,33 +1,53 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+import { NextResponse } from 'next/server';
 
-export async function POST(req: NextRequest) {
-    const { accessToken, refreshToken, userId, userEmail, userRole, isAdmin, companyId } = await req.json();
+export async function POST(request: Request) {
+    try {
+        const body = await request.json();
+        const {
+            accessToken,
+            refreshToken,
+            userId,
+            userEmail,
+            userRole,
+            isAdmin,
+            companyId,
+        } = body;
 
-    if (!accessToken || !refreshToken || !userId || !userEmail) {
-        return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+        const response = NextResponse.json({ message: 'Authentication successful' }, { status: 200 });
+
+        // Set cookies with appropriate settings for local development
+        response.cookies.set('accessToken', accessToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            path: '/',
+        });
+        response.cookies.set('refreshToken', refreshToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            path: '/',
+        });
+        response.cookies.set('user', JSON.stringify({
+            id: userId,
+            email: userEmail,
+            role: userRole,
+            isAdmin,
+            companyId,
+        }), {
+            httpOnly: false,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            path: '/',
+        });
+
+        return response;
+    } catch (error) {
+        console.error('Auth error:', error);
+        return NextResponse.json(
+            { message: 'Authentication failed' },
+            { status: 500 }
+        );
     }
-
-    // Retrieve from localStorage if missing (OAuth users)
-    const storedCompanyId = req.cookies.get('pending-company-id')?.value;
-    const storedUserRole = req.cookies.get('pending-user-role')?.value;
-
-    const finalCompanyId = companyId || storedCompanyId || 'UNKNOWN_COMPANY';
-    const finalUserRole = userRole || storedUserRole || 'employee';
-    const finalIsAdmin = isAdmin ?? false;
-
-    const response = NextResponse.json({ message: 'Authenticated' });
-
-    // Store tokens
-    response.cookies.set('supabase-token', accessToken, { httpOnly: true, secure: false, path: '/', sameSite: 'lax', maxAge: 3600 });
-    response.cookies.set('supabase-refresh-token', refreshToken, { httpOnly: true, secure: false, path: '/', sameSite: 'lax', maxAge: 60 * 60 * 24 * 7 });
-
-    // Store user details
-    response.cookies.set('user-id', userId, { httpOnly: true, secure: false, path: '/', sameSite: 'lax', maxAge: 60 * 60 * 24 * 7 });
-    response.cookies.set('user-email', userEmail, { httpOnly: true, secure: false, path: '/', sameSite: 'lax', maxAge: 60 * 60 * 24 * 7 });
-
-    response.cookies.set('user-role', finalUserRole, { httpOnly: true, secure: false, path: '/', sameSite: 'lax', maxAge: 60 * 60 * 24 * 7 });
-    response.cookies.set('company-id', finalCompanyId, { httpOnly: true, secure: false, path: '/', sameSite: 'lax', maxAge: 60 * 60 * 24 * 7 });
-    response.cookies.set('is-admin', finalIsAdmin.toString(), { httpOnly: true, secure: false, path: '/', sameSite: 'lax', maxAge: 60 * 60 * 24 * 7 });
-
-    return response;
 }

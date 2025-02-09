@@ -39,20 +39,30 @@ export default function Navbar() {
                 </GradientText>
             </div>
             <div className="w-1/3 p-3 rounded-sm flex justify-between items-center gap-5">
-                {['Home', 'Features', 'Contact Us', 'Login'].map((item, index) => (
-                    <motion.div
-                        key={index}
-                        whileHover={{ scale: 1.2 }}
-                        transition={{ duration: 0.2 }}
-                    >
-                        <Link
-                            href={item === 'Home' ? '/' : `#${item.toLowerCase().replace(' ', '')}`}
-                            className="text-white hover:text-blue-500 transition duration-300"
+                {['Home', 'Features', 'Contact Us', 'Login'].map(
+                    (item, index) => (
+                        <motion.div
+                            key={index}
+                            whileHover={{ scale: 1.2 }}
+                            transition={{ duration: 0.2 }}
                         >
-                            {item}
-                        </Link>
-                    </motion.div>
-                ))}
+                            <Link
+                                href={
+                                    item === 'Login'
+                                        ? '/login'
+                                        : item === 'Home'
+                                        ? '/'
+                                        : `#${item
+                                              .toLowerCase()
+                                              .replace(' ', '')}`
+                                }
+                                className="text-white hover:text-blue-500 transition duration-300"
+                            >
+                                {item}
+                            </Link>
+                        </motion.div>
+                    )
+                )}
             </div>
         </motion.nav>
     );
