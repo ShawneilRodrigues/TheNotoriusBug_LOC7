@@ -13,10 +13,10 @@ def analyze_sentiment(text):
 
 def create_jira_issue(summary, description):
     """Create a Jira issue if frustration is detected."""
-    os.environ["JIRA_API_TOKEN"] = "ATATT3xFfGF02VWRAB8A748WyoYkeg7iqCZr5fAB6t9y42immM8qIWdbeHUmjYmnIYNnHyGDdokLbSGBM7JN9R1OvV4a4uFRb5Jwqn_AcDTN2K-nTSFqxvjMjDdJD3ffy-V4RA3lzDrQF5VO0FqZhtnk9LE7UqGKOJUEVxN7Oc2t4R7BXFH3Ftg=BE79AE1F"
+    os.environ["JIRA_API_TOKEN"] = "api-key"
     os.environ["JIRA_USERNAME"] = "xxxxxxxxx@gmail.com"
     os.environ["JIRA_INSTANCE_URL"] = "https://locnotoriusbug.atlassian.net"
-    os.environ["GOOGLE_API_KEY"] = "AIzaSyDaRLxg355SXAXYhCu7V5PbowTbSV5c_wY"
+    os.environ["GOOGLE_API_KEY"] = "api-key"
     os.environ["JIRA_CLOUD"] = "true"  # Add this line to indicate it's a Jira Cloud instance
     
     llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro")
