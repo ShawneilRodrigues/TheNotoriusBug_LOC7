@@ -1,4 +1,4 @@
-# OmnoBot: Agentic AI for Enterprise Automation
+# OmniBot: Agentic AI for Enterprise Automation
 
 [![View on GitHub](https://img.shields.io/badge/View%20on-GitHub-blue?logo=github)](https://github.com/ShawneilRodrigues/OmnoBot)
 [![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=flat&logo=fastapi)](https://fastapi.tiangolo.com/)
@@ -7,7 +7,7 @@
 
 ## 🤖 Overview
 
-OmnoBot is an advanced agentic AI platform designed to automate enterprise workflows and streamline business operations. Built with cutting-edge technologies including **LangChain**, **PhiData**, and **Generative AI**, this platform autonomously executes tasks by integrating with external APIs such as Jira, Zoom, and more to enhance operational efficiency and reduce manual administrative effort.
+OmniBot is an advanced agentic AI platform designed to automate enterprise workflows and streamline business operations. Built with cutting-edge technologies including **LangChain**, **PhiData**, and **Generative AI**, this platform autonomously executes tasks by integrating with external APIs such as Jira, Zoom, and more to enhance operational efficiency and reduce manual administrative effort.
 
 ## ✨ Key Features
 
